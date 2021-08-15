@@ -1,0 +1,126 @@
+
+--------------------------------------------------------
+--  DDL for Package TYPES
+--------------------------------------------------------
+
+  CREATE OR REPLACE PACKAGE "HR"."TYPES" AS
+            TYPE cursor_type IS REF CURSOR;
+            END Types;
+
+/
+
+--------------------------------------------------------
+--  DDL for Procedure
+--------------------------------------------------------
+
+create or replace PROCEDURE getAllemployees(dep_id in number 
+, emp_salary in number ,p_recordset OUT types.cursor_type)
+AS
+           BEGIN
+           OPEN p_recordset FOR
+           SELECT 
+           e.employee_id ,
+           E.first_name ,
+    E.last_name ,
+    J.JOB_TITLE ,    
+    '-' as "PREVIOUS_POSITION_TITLE" ,
+    l.CITY  ,  
+      e.salary ,     
+   M.first_name  || ' ' || M.last_name AS "MANAGER_FULLNAME"
+   
+     FROM employees E 
+       JOIN employees M
+        ON E.manager_id = M.employee_id  
+        JOIN jobs J 
+        ON J.job_id=e.job_id
+        JOIN departments d
+        ON d.department_id=E.department_id
+        JOIN locations l
+        ON l.location_id=D.location_id
+       LEFT OUTER JOIN job_history JH
+        ON JH.employee_id=e.employee_id      
+        where   E.salary>emp_salary and E.DEPARTMENT_ID=dep_id  and e.employee_id NOT IN ( select employee_id from job_history ) 
+        
+         UNION 
+              
+          SELECT 
+           e.employee_id ,
+           E.first_name ,
+    E.last_name ,
+    J.JOB_TITLE ,      
+     (select job_title from jobs where job_id=jh.job_id)   as "PREVIOUS_POSITION_TITLE" ,
+    l.CITY  ,  
+      e.salary ,     
+   M.first_name  || ' ' || M.last_name AS "MANAGER_FULLNAME"
+   
+     FROM employees E 
+       JOIN employees M
+        ON E.manager_id = M.employee_id  
+        JOIN jobs J 
+        ON J.job_id=e.job_id
+        JOIN departments d
+        ON d.department_id=E.department_id
+        JOIN locations l
+        ON l.location_id=D.location_id
+       LEFT OUTER JOIN job_history JH
+        ON JH.employee_id=e.employee_id      
+        where E.salary>emp_salary and E.DEPARTMENT_ID=dep_id and jh.end_date = (SELECT MAX(jh2.end_date)
+                FROM job_history jh2
+                WHERE jh2.employee_id = jh.employee_id
+               );       
+       
+          END getAllemployees;
+
+/
+
+--------------------------------------------------------
+--  DDL for DB_LOG TABLE
+--------------------------------------------------------
+
+  CREATE TABLE "HR"."DB_LOGS"
+   (	"ID" NUMBER GENERATED ALWAYS AS IDENTITY MINVALUE 1 MAXVALUE 9999999999999999999999999999 INCREMENT BY 1 START WITH 1 CACHE 20 NOORDER  NOCYCLE  NOKEEP  NOSCALE , 
+	"LOG_TIME" DATE, 
+	"LOG_USER_ID" NUMBER, 
+	"MESSAGE" VARCHAR2(4000 BYTE)
+   ) SEGMENT CREATION IMMEDIATE 
+  PCTFREE 10 PCTUSED 40 INITRANS 1 MAXTRANS 255 
+ NOCOMPRESS LOGGING
+  STORAGE(INITIAL 65536 NEXT 1048576 MINEXTENTS 1 MAXEXTENTS 2147483645
+  PCTINCREASE 0 FREELISTS 1 FREELIST GROUPS 1
+  BUFFER_POOL DEFAULT FLASH_CACHE DEFAULT CELL_FLASH_CACHE DEFAULT)
+  TABLESPACE "SYSAUX" ;
+
+  CREATE UNIQUE INDEX "HR"."DB_LOGS_PK" ON "HR"."DB_LOGS" ("ID") 
+  PCTFREE 10 INITRANS 2 MAXTRANS 255 COMPUTE STATISTICS 
+  STORAGE(INITIAL 65536 NEXT 1048576 MINEXTENTS 1 MAXEXTENTS 2147483645
+  PCTINCREASE 0 FREELISTS 1 FREELIST GROUPS 1
+  BUFFER_POOL DEFAULT FLASH_CACHE DEFAULT CELL_FLASH_CACHE DEFAULT)
+  TABLESPACE "SYSAUX" ;
+
+   ALTER TABLE "HR"."DB_LOGS" ADD CONSTRAINT "DB_LOGS_PK" PRIMARY KEY ("ID")
+  USING INDEX "HR"."DB_LOGS_PK"  ENABLE;
+
+
+
+/
+
+
+--------------------------------------------------------
+--  DDL for DB_LOG INSERT PROCEDURE
+--------------------------------------------------------
+
+create or replace PROCEDURE INSERTLOG(
+       userid in NUMBER,
+       message in VARCHAR2,
+       log_time in DATE)
+IS
+BEGIN
+
+  INSERT INTO DB_LOGS ("LOG_USER_ID", "MESSAGE","LOG_TIME") 
+  VALUES ( userid,message,to_date(log_time,'DD/MM/RRRR'));
+
+  COMMIT;
+
+END;
+
+
